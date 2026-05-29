@@ -251,7 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Optimistically increment the counter
         window.updateTotalUnits(localTotalUnits + 1);
 
-        // Layer 2: Client Event ID & payload creation
+        // Layer 2: Client Event ID & payload
         const logData = {
             action: "logFlavor",
             eventId: generateEventId(),
@@ -262,16 +262,17 @@ document.addEventListener('DOMContentLoaded', () => {
             timestamp: new Date().toISOString()
         };
 
-        // Offline-First Logic
-        try {
-            await window.pixlDB.addLog(logData);
-            // Trigger sync immediately to send it ASAP if online
-            if (window.syncManager) {
-                window.syncManager.syncNow();
-            }
-        } catch (error) {
-            console.error("Failed to queue log:", error);
-            showToast("⚠️ Error saving log locally");
+        // Queue in IndexedDB for offline support
+        if (window.pixlDB && window.syncManager) {
+            window.pixlDB.addLog(logData).then(() => {
+                // Trigger sync immediately
+                window.syncManager.syncNow().catch(err => alert("Sync Network Error: " + err.message));
+            }).catch(err => {
+                console.error('Failed to queue log:', err);
+                alert('Database Error: Your device is blocking local storage. ' + err);
+            });
+        } else {
+            alert("System Error: App failed to initialize the database in the background.");
         }
     }
 
