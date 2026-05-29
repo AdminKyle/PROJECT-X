@@ -46,32 +46,31 @@ class SyncManager {
     }
 
     async sendToServer(logData) {
-        return new Promise((resolve) => {
-            try {
-                const payload = encodeURIComponent(JSON.stringify(logData));
-                const url = `${APPS_SCRIPT_URL}?action=logFlavor&payload=${payload}&t=${Date.now()}`;
-
-                const img = new Image();
-
-                img.onload = () => {
-                    console.log('[Sync] Beacon onload fired');
-                    this.refreshTotalUnits();
-                    resolve(true);
-                };
-                img.onerror = () => {
-                    // onerror fires because Apps Script returns JSON, not an image.
-                    // But the HTTP request DID reach the server and was processed.
-                    console.log('[Sync] Beacon onerror fired (expected — request was sent)');
-                    this.refreshTotalUnits();
-                    resolve(true);
-                };
-
-                img.src = url;
-            } catch (error) {
-                console.error('[Sync] Beacon error:', error);
-                resolve(false);
+        try {
+            const payload = encodeURIComponent(JSON.stringify(logData));
+            const url = `${APPS_SCRIPT_URL}?action=logFlavor&payload=${payload}&t=${Date.now()}`;
+            
+            const response = await fetch(url, { redirect: 'follow' });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.success) {
+                    console.log('[Sync] Log accepted by server:', data.result);
+                    
+                    // Update total units from the authoritative server count
+                    const units = data.totalLoggedUnits !== undefined ? data.totalLoggedUnits : data.totalUnits;
+                    if (units !== undefined && window.updateTotalUnits) {
+                        window.updateTotalUnits(units);
+                    }
+                    return true;
+                }
             }
-        });
+            console.error('[Sync] Server rejected log or returned non-ok status');
+            return false;
+        } catch (error) {
+            console.error('[Sync] Fetch error:', error);
+            return false;
+        }
     }
 
     async refreshTotalUnits() {
