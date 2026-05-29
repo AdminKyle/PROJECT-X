@@ -8,10 +8,7 @@ class SyncManager {
     }
 
     start() {
-        // Run sync periodically
         setInterval(() => this.syncNow(), SYNC_INTERVAL_MS);
-        
-        // Also try syncing when coming back online
         window.addEventListener('online', () => this.syncNow());
     }
 
@@ -23,7 +20,7 @@ class SyncManager {
         this.isSyncing = true;
         try {
             const pendingLogs = await this.db.getPendingLogs();
-            
+
             if (pendingLogs.length === 0) {
                 this.isSyncing = false;
                 return;
@@ -31,7 +28,6 @@ class SyncManager {
 
             console.log(`[Sync] Attempting to sync ${pendingLogs.length} logs...`);
 
-            // Try to sync one by one
             for (const log of pendingLogs) {
                 const success = await this.sendToServer(log);
                 if (success) {
@@ -39,7 +35,6 @@ class SyncManager {
                     console.log(`[Sync] Successfully synced and removed: ${log.eventId}`);
                 } else {
                     console.error(`[Sync] Failed to sync: ${log.eventId}. Will retry later.`);
-                    // Stop trying other logs if one fails (usually implies network/server issue)
                     break;
                 }
             }
@@ -55,29 +50,44 @@ class SyncManager {
             try {
                 const payload = encodeURIComponent(JSON.stringify(logData));
                 const url = `${APPS_SCRIPT_URL}?action=logFlavor&payload=${payload}&t=${Date.now()}`;
-                
-                // Use the ultimate bulletproof method for cross-domain GET: an Image beacon.
-                // This bypasses ALL fetch/CORS/ITP restrictions on strict mobile browsers.
+
                 const img = new Image();
-                
-                // Whether it loads or fails (because the Apps Script returns JSON, not an image),
-                // the request definitively reached the server.
+
                 img.onload = () => {
+                    console.log('[Sync] Beacon onload fired');
                     this.refreshTotalUnits();
                     resolve(true);
                 };
                 img.onerror = () => {
+                    // onerror fires because Apps Script returns JSON, not an image.
+                    // But the HTTP request DID reach the server and was processed.
+                    console.log('[Sync] Beacon onerror fired (expected — request was sent)');
                     this.refreshTotalUnits();
                     resolve(true);
                 };
-                
-                // Trigger the request
+
                 img.src = url;
             } catch (error) {
-                alert("Beacon Error: " + error.message);
+                console.error('[Sync] Beacon error:', error);
                 resolve(false);
             }
         });
+    }
+
+    async refreshTotalUnits() {
+        try {
+            const res = await fetch(`${APPS_SCRIPT_URL}?action=getProducts&t=${Date.now()}`);
+            const data = await res.json();
+            if (data) {
+                const units = data.totalLoggedUnits !== undefined ? data.totalLoggedUnits : data.totalUnits;
+                if (units !== undefined && window.updateTotalUnits) {
+                    window.updateTotalUnits(units);
+                }
+            }
+        } catch (e) {
+            // Non-critical — counter will update on next app load
+            console.log('[Sync] refreshTotalUnits failed (non-critical):', e);
+        }
     }
 }
 
