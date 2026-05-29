@@ -1,4 +1,4 @@
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6MsNSYvRBEMXjUygkzVmCl4TfmoqgLQskDQIRmh3gQCBF02QiL6SzOGnZIOocRecy/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwYi9Rz4_wDm2182wbW5QKrslQ4GqurZvLPkFMJx0dtiPd1hJcZTAm1I23xByiZ9JKR/exec';
 const SYNC_INTERVAL_MS = 5000; // 5 seconds
 
 class SyncManager {
