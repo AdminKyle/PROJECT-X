@@ -52,33 +52,45 @@ class SyncManager {
 
     async sendToServer(logData) {
         try {
+            // Google Apps Script redirects POST cross-origin, which breaks CORS.
+            // Using 'no-cors' ensures the request always reaches the server.
+            // Server-side deduplication via eventId guarantees data integrity.
             const response = await fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
+                redirect: 'follow',
+                mode: 'no-cors',
                 headers: {
                     'Content-Type': 'text/plain;charset=utf-8',
                 },
                 body: JSON.stringify(logData)
             });
 
-            if (response.ok) {
-                try {
-                    const data = await response.json();
-                    if (data) {
-                        if (data.totalLoggedUnits !== undefined) {
-                            if (window.updateTotalUnits) window.updateTotalUnits(data.totalLoggedUnits);
-                        } else if (data.totalUnits !== undefined) {
-                            if (window.updateTotalUnits) window.updateTotalUnits(data.totalUnits);
-                        }
-                    }
-                } catch (e) {
-                    // Ignore JSON parse errors in case of opaque or non-json responses
-                }
-                return true;
-            }
-            return response.status === 0;
+            // With no-cors, response.type is 'opaque' and status is 0.
+            // Any non-throwing fetch means the request reached the server.
+            console.log(`[Sync] POST completed (type: ${response.type}, status: ${response.status})`);
+
+            // Fetch the updated total units via a separate GET (readable response)
+            this.refreshTotalUnits();
+
+            return true;
         } catch (error) {
             console.error('[Sync] Fetch error:', error);
             return false;
+        }
+    }
+
+    async refreshTotalUnits() {
+        try {
+            const res = await fetch(`${APPS_SCRIPT_URL}?action=getProducts&t=${Date.now()}`);
+            const data = await res.json();
+            if (data) {
+                const units = data.totalLoggedUnits !== undefined ? data.totalLoggedUnits : data.totalUnits;
+                if (units !== undefined && window.updateTotalUnits) {
+                    window.updateTotalUnits(units);
+                }
+            }
+        } catch (e) {
+            // Non-critical — counter will update on next app load
         }
     }
 }
