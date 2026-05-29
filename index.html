@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PIXL Logger</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+    <meta name="theme-color" content="#050505">
+    
+    <!-- Google Fonts for Premium Aesthetic -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Fuse.js for fuzzy search -->
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+</head>
+<body>
+
+    <!-- Main UI -->
+    <main id="main-ui">
+        <button id="logout-btn" aria-label="Log Out" title="Log Out">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+        </button>
+
+        <div class="main-content">
+            <!-- Unit Counter Card -->
+            <div id="unit-counter-card">
+                <span class="counter-label">TOTAL LOGGED</span>
+                <span id="total-units-counter" class="counter-value">0</span>
+                <span class="counter-unit">UNITS</span>
+            </div>
+
+            <!-- Search Button -->
+            <button id="search-trigger" aria-label="Open Search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </button>
+
+            <!-- Last Logged Card -->
+            <div id="last-logged-card">
+                <span class="last-logged-label">LAST LOGGED</span>
+                <span id="last-logged-name">—</span>
+            </div>
+        </div>
+    </main>
+
+    <!-- Full-screen Search Overlay -->
+    <div id="search-overlay" class="hidden">
+        <div class="search-header">
+            <button id="close-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <input type="text" id="search-input" placeholder="Search flavours..." autocomplete="off">
+        </div>
+        <div id="search-results"></div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container"></div>
+
+    <!-- Setup Modal (Premium PIXL Login) -->
+    <div id="setup-modal" class="hidden">
+        <div class="login-container">
+            <div class="logo-container">
+                <h1 class="pixl-logo">PIXL</h1>
+                <p class="project-x">PROJECT X</p>
+            </div>
+            
+            <div class="input-group">
+                <input type="text" id="username-input" placeholder="OPERATOR NAME" autocomplete="off" autocorrect="off" spellcheck="false">
+            </div>
+            
+            <div class="input-group">
+                <input type="password" id="pin-input" placeholder="ACCESS PIN" inputmode="numeric">
+            </div>
+            
+            <button id="login-btn">
+                <span>AUTHENTICATE</span>
+            </button>
+            
+            <div id="login-error" class="hidden"></div>
+        </div>
+    </div>
+
+    <script src="db.js"></script>
+    <script src="sync.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
