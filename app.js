@@ -232,7 +232,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Strip spaces and special chars from username for a clean ID prefix
         const userPrefix = (currentUser || 'USER').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-        return `LOG_${userPrefix}_${counter}`;
+        
+        // CRITICAL FIX: Add Date.now() to ensure uniqueness even if the user clears their cache
+        // and the counter resets to 0.
+        return `LOG_${userPrefix}_${Date.now()}_${counter}`;
     }
 
     async function handleFlavorSelect(flavorName) {
