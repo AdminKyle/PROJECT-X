@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIXL Sync Diagnostic</title>
+    <style>
+        body { font-family: monospace; background: #111; color: #0f0; padding: 16px; font-size: 14px; }
+        button { background: #0f0; color: #000; border: none; padding: 12px 24px; font-size: 16px; margin: 8px 4px; cursor: pointer; font-weight: bold; }
+        .log { margin: 4px 0; padding: 4px; border-left: 3px solid #333; padding-left: 8px; }
+        .error { color: #f44; border-left-color: #f44; }
+        .success { color: #0f0; border-left-color: #0f0; }
+        .info { color: #4af; border-left-color: #4af; }
+        #output { margin-top: 16px; max-height: 70vh; overflow-y: auto; }
+        h1 { color: #fff; font-size: 18px; }
+    </style>
+</head>
+<body>
+    <h1>PIXL SYNC DIAGNOSTIC</h1>
+    <p style="color:#888">This page tests EVERY method of sending data to your Google Sheet. No service worker, no IndexedDB, no caching.</p>
+    
+    <button onclick="runAllTests()">RUN ALL TESTS</button>
+    <button onclick="clearLog()">CLEAR</button>
+    
+    <div id="output"></div>
+
+    <script>
+        const URL_BASE = 'https://script.google.com/macros/s/AKfycbwYi9Rz4_wDm2182wbW5QKrslQ4GqurZvLPkFMJx0dtiPd1hJcZTAm1I23xByiZ9JKR/exec';
+        const output = document.getElementById('output');
+
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearLog() { output.innerHTML = ''; }
+
+        async function runAllTests() {
+            clearLog();
+            log('=== STARTING DIAGNOSTIC ===');
+            log(`Browser: ${navigator.userAgent}`);
+            log(`Online: ${navigator.onLine}`);
+            log(`URL Base: ${URL_BASE}`);
+            
+            // Unregister ALL service workers first
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const reg of regs) {
+                    await reg.unregister();
+                    log(`Unregistered service worker: ${reg.scope}`, 'info');
+                }
+                if (regs.length === 0) log('No service workers found', 'info');
+            }
+
+            log('');
+            log('--- TEST 1: Basic fetch (GET products) ---');
+            await test1_fetchProducts();
+
+            log('');
+            log('--- TEST 2: fetch with redirect:follow ---');
+            await test2_fetchRedirect();
+
+            log('');
+            log('--- TEST 3: fetch with mode:no-cors ---');
+            await test3_fetchNoCors();
+
+            log('');
+            log('--- TEST 4: Image beacon ---');
+            await test4_imageBeacon();
+
+            log('');
+            log('--- TEST 5: XMLHttpRequest ---');
+            await test5_xhr();
+
+            log('');
+            log('--- TEST 6: Script tag injection ---');
+            await test6_scriptTag();
+
+            log('');
+            log('=== DIAGNOSTIC COMPLETE ===');
+        }
+
+        // TEST 1: Can we even reach the server at all?
+        async function test1_fetchProducts() {
+            try {
+                const url = `${URL_BASE}?action=getProducts&t=${Date.now()}`;
+                log(`Fetching: ${url.substring(0, 80)}...`);
+                const res = await fetch(url);
+                log(`Status: ${res.status}, Type: ${res.type}, OK: ${res.ok}`);
+                const text = await res.text();
+                log(`Response (first 200 chars): ${text.substring(0, 200)}`, res.ok ? 'success' : 'error');
+            } catch (e) {
+                log(`FAILED: ${e.name}: ${e.message}`, 'error');
+            }
+        }
+
+        // TEST 2: Send a log via fetch with explicit redirect:follow
+        async function test2_fetchRedirect() {
+            try {
+                const logData = { action:'logFlavor', eventId:'DIAG_TEST2_'+Date.now(), flavour:'DIAG Test 2', user:'Kyle', quantity:1, timestamp:new Date().toISOString() };
+                const payload = encodeURIComponent(JSON.stringify(logData));
+                const url = `${URL_BASE}?action=logFlavor&payload=${payload}&t=${Date.now()}`;
+                log(`Fetching with redirect:follow...`);
+                const res = await fetch(url, { redirect: 'follow' });
+                log(`Status: ${res.status}, Type: ${res.type}, OK: ${res.ok}`);
+                const text = await res.text();
+                log(`Response: ${text.substring(0, 300)}`, text.includes('success') ? 'success' : 'error');
+            } catch (e) {
+                log(`FAILED: ${e.name}: ${e.message}`, 'error');
+            }
+        }
+
+        // TEST 3: fetch with no-cors
+        async function test3_fetchNoCors() {
+            try {
+                const logData = { action:'logFlavor', eventId:'DIAG_TEST3_'+Date.now(), flavour:'DIAG Test 3', user:'Kyle', quantity:1, timestamp:new Date().toISOString() };
+                const payload = encodeURIComponent(JSON.stringify(logData));
+                const url = `${URL_BASE}?action=logFlavor&payload=${payload}&t=${Date.now()}`;
+                log(`Fetching with mode:no-cors...`);
+                const res = await fetch(url, { mode: 'no-cors' });
+                log(`Status: ${res.status}, Type: ${res.type} (opaque = request was sent but response hidden)`, 'success');
+            } catch (e) {
+                log(`FAILED: ${e.name}: ${e.message}`, 'error');
+            }
+        }
+
+        // TEST 4: Image beacon
+        async function test4_imageBeacon() {
+            return new Promise((resolve) => {
+                try {
+                    const logData = { action:'logFlavor', eventId:'DIAG_TEST4_'+Date.now(), flavour:'DIAG Test 4', user:'Kyle', quantity:1, timestamp:new Date().toISOString() };
+                    const payload = encodeURIComponent(JSON.stringify(logData));
+                    const url = `${URL_BASE}?action=logFlavor&payload=${payload}&t=${Date.now()}`;
+                    log(`Creating Image beacon...`);
+                    const img = new Image();
+                    img.onload = () => { log('Image onload fired (request reached server)', 'success'); resolve(); };
+                    img.onerror = () => { log('Image onerror fired (expected — request reached server but response is JSON not image)', 'success'); resolve(); };
+                    img.src = url;
+                    setTimeout(() => { log('Image beacon timed out after 10s — request may have been blocked', 'error'); resolve(); }, 10000);
+                } catch (e) {
+                    log(`FAILED: ${e.name}: ${e.message}`, 'error');
+                    resolve();
+                }
+            });
+        }
+
+        // TEST 5: XMLHttpRequest (old school)
+        async function test5_xhr() {
+            return new Promise((resolve) => {
+                try {
+                    const logData = { action:'logFlavor', eventId:'DIAG_TEST5_'+Date.now(), flavour:'DIAG Test 5', user:'Kyle', quantity:1, timestamp:new Date().toISOString() };
+                    const payload = encodeURIComponent(JSON.stringify(logData));
+                    const url = `${URL_BASE}?action=logFlavor&payload=${payload}&t=${Date.now()}`;
+                    log(`Sending XMLHttpRequest...`);
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', url, true);
+                    xhr.onload = () => { log(`XHR Status: ${xhr.status}, Response: ${xhr.responseText.substring(0, 200)}`, xhr.status === 200 ? 'success' : 'error'); resolve(); };
+                    xhr.onerror = () => { log(`XHR onerror fired — CORS or network block`, 'error'); resolve(); };
+                    xhr.ontimeout = () => { log(`XHR timed out`, 'error'); resolve(); };
+                    xhr.timeout = 10000;
+                    xhr.send();
+                } catch (e) {
+                    log(`FAILED: ${e.name}: ${e.message}`, 'error');
+                    resolve();
+                }
+            });
+        }
+
+        // TEST 6: JSONP-style script injection (absolute last resort)
+        async function test6_scriptTag() {
+            return new Promise((resolve) => {
+                try {
+                    const logData = { action:'logFlavor', eventId:'DIAG_TEST6_'+Date.now(), flavour:'DIAG Test 6', user:'Kyle', quantity:1, timestamp:new Date().toISOString() };
+                    const payload = encodeURIComponent(JSON.stringify(logData));
+                    const url = `${URL_BASE}?action=logFlavor&payload=${payload}&t=${Date.now()}`;
+                    log(`Injecting script tag...`);
+                    const script = document.createElement('script');
+                    script.src = url;
+                    script.onload = () => { log('Script onload — request reached server', 'success'); script.remove(); resolve(); };
+                    script.onerror = () => { log('Script onerror — request may have been blocked or CORS issue', 'error'); script.remove(); resolve(); };
+                    document.head.appendChild(script);
+                    setTimeout(() => { log('Script tag timed out after 10s', 'error'); resolve(); }, 10000);
+                } catch (e) {
+                    log(`FAILED: ${e.name}: ${e.message}`, 'error');
+                    resolve();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
