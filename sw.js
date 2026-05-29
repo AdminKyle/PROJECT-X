@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pixl-pwa-v11';
+const CACHE_NAME = 'pixl-pwa-v12';
 const urlsToCache = [
   './',
   './index.html',
@@ -40,10 +40,13 @@ self.addEventListener('fetch', event => {
   // Don't cache POST requests or external API calls dynamically here, 
   // they are handled by IndexedDB sync queue.
   if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('script.google.com')) {
-      // For the GET products call, try network first, then fail silently (app uses cache/mocks)
-      event.respondWith(fetch(event.request).catch(() => new Response(JSON.stringify([]))));
-      return;
+
+  // CRITICAL: Let ALL Google Apps Script requests pass through to the network
+  // without ANY service worker interception. The SW was consuming/blocking
+  // the logFlavor beacon requests, preventing data from reaching the sheet.
+  if (event.request.url.includes('script.google.com') || 
+      event.request.url.includes('script.googleusercontent.com')) {
+      return; // Do NOT call event.respondWith — let the browser handle it natively
   }
 
   event.respondWith(
