@@ -52,45 +52,39 @@ class SyncManager {
 
     async sendToServer(logData) {
         try {
-            // Google Apps Script redirects POST cross-origin, which breaks CORS.
-            // Using 'no-cors' ensures the request always reaches the server.
-            // Server-side deduplication via eventId guarantees data integrity.
-            const response = await fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                redirect: 'follow',
-                mode: 'no-cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify(logData)
-            });
-
-            // With no-cors, response.type is 'opaque' and status is 0.
-            // Any non-throwing fetch means the request reached the server.
-            console.log(`[Sync] POST completed (type: ${response.type}, status: ${response.status})`);
-
-            // Fetch the updated total units via a separate GET (readable response)
-            this.refreshTotalUnits();
-
-            return true;
+            // Use GET with encoded payload to avoid POST redirect/CORS issues
+            // with Google Apps Script. The server-side deduplication via eventId
+            // guarantees data integrity even if the same request is sent twice.
+            const payload = encodeURIComponent(JSON.stringify(logData));
+            const url = `${APPS_SCRIPT_URL}?action=logFlavor&payload=${payload}&t=${Date.now()}`;
+            
+            const response = await fetch(url);
+            
+            if (response.ok) {
+                try {
+                    const data = await response.json();
+                    if (data && data.success) {
+                        // Update total units from the authoritative server count
+                        const units = data.totalLoggedUnits !== undefined ? data.totalLoggedUnits : data.totalUnits;
+                        if (units !== undefined && window.updateTotalUnits) {
+                            window.updateTotalUnits(units);
+                        }
+                        return true;
+                    }
+                    // Server responded but said it wasn't successful
+                    console.error('[Sync] Server rejected log:', data);
+                    return false;
+                } catch (e) {
+                    // Could not parse JSON but response was ok — treat as success
+                    return true;
+                }
+            }
+            
+            console.error(`[Sync] Server returned status ${response.status}`);
+            return false;
         } catch (error) {
             console.error('[Sync] Fetch error:', error);
             return false;
-        }
-    }
-
-    async refreshTotalUnits() {
-        try {
-            const res = await fetch(`${APPS_SCRIPT_URL}?action=getProducts&t=${Date.now()}`);
-            const data = await res.json();
-            if (data) {
-                const units = data.totalLoggedUnits !== undefined ? data.totalLoggedUnits : data.totalUnits;
-                if (units !== undefined && window.updateTotalUnits) {
-                    window.updateTotalUnits(units);
-                }
-            }
-        } catch (e) {
-            // Non-critical — counter will update on next app load
         }
     }
 }
