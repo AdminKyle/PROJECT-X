@@ -58,30 +58,19 @@ class SyncManager {
             const payload = encodeURIComponent(JSON.stringify(logData));
             const url = `${APPS_SCRIPT_URL}?action=logFlavor&payload=${payload}&t=${Date.now()}`;
             
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                method: 'GET',
+                mode: 'no-cors' // Crucial for bypassing Safari ITP and strict CORS on mobile
+            });
             
-            if (response.ok) {
-                try {
-                    const data = await response.json();
-                    if (data && data.success) {
-                        // Update total units from the authoritative server count
-                        const units = data.totalLoggedUnits !== undefined ? data.totalLoggedUnits : data.totalUnits;
-                        if (units !== undefined && window.updateTotalUnits) {
-                            window.updateTotalUnits(units);
-                        }
-                        return true;
-                    }
-                    // Server responded but said it wasn't successful
-                    console.error('[Sync] Server rejected log:', data);
-                    return false;
-                } catch (e) {
-                    // Could not parse JSON but response was ok — treat as success
-                    return true;
-                }
-            }
+            // With no-cors, the response is opaque (status 0) and we cannot read the JSON body.
+            // But if fetch didn't throw an error, the request reached the Google server.
+            console.log('[Sync] GET request completed (opaque response)');
             
-            console.error(`[Sync] Server returned status ${response.status}`);
-            return false;
+            // Trigger a separate background refresh to get the updated unit count
+            this.refreshTotalUnits();
+            
+            return true;
         } catch (error) {
             console.error('[Sync] Fetch error:', error);
             return false;
